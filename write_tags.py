@@ -50,7 +50,26 @@ args = parser.parse_args()
 
 def record_to_text(record):
     """Translate a json spool object to a readable string"""
-    return f"#{record['id']} {record['filament']['vendor']['name']} - {record['filament']['name']}"
+    return f"#{record['id']:3} {record['filament']['vendor']['name']:10} - {record['filament']['name']:20} - {record['extra']['spool_material'][1:-1]}"
+
+def records_to_text_list(records):
+    """Translate list of json spool objects to a readable list of strings"""
+    # First pass to get max length of each field
+    max_id = max_fvn = max_fn = 0
+    for record in records:
+        if len(str(record['id'])) > max_id:
+            max_id = len(str(record['id']))
+        if len(record['filament']['vendor']['name']) > max_fvn:
+            max_fvn = len(record['filament']['vendor']['name'])
+        if len(record['filament']['name']) > max_fn:
+            max_fn = len(record['filament']['name'])
+
+    # Second pass we create the text.
+    text_list = []
+    for record in records:
+        text_list.append(f"#{record['id']:>{max_id}} {record['filament']['vendor']['name']:{max_fvn}} - {record['filament']['name']:{max_fn}} - {record['extra']['spool_material'][1:-1]}")
+
+    return text_list
 
 
 class PostList(npyscreen.MultiLineAction):
@@ -79,7 +98,8 @@ class PostSelectForm(npyscreen.FormBaseNew):
 
         self.posts = self.add(
             PostList,
-            values=list(map(record_to_text, self.records)),
+#            values=list(map(record_to_text, self.records)),
+            values=records_to_text_list(self.records),
             name="Choose spools to write",
             scroll_exit=True,
         )
