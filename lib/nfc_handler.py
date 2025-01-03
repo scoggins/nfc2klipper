@@ -89,7 +89,7 @@ class NfcHandler:
         for record in records:
             # Look for the JSON record first
             if record.type == NDEF_JSON_TYPE and record.name == "nfc2klipper":
-                logger.info("Read JSON record: %s", record)
+                logger.debug("Read JSON record: %s", record)
                 data = json.loads(record.data)
                 spool = data.get("spool")
                 filament = data.get("filament")
@@ -97,7 +97,7 @@ class NfcHandler:
 
             # Look for the text record
             if record.type == NDEF_TEXT_TYPE:
-                logger.info("Read text record: %s", record)
+                logger.debug("Read text record: %s", record)
                 for line in record.text.splitlines():
                     line = line.split(":")
                     if len(line) == 2:
