@@ -5,6 +5,7 @@
 
 import time
 import logging
+import json
 from threading import Lock, Event
 
 import ndef
@@ -15,9 +16,9 @@ from nfc.clf import RemoteTarget
 SPOOL = "SPOOL"
 FILAMENT = "FILAMENT"
 NDEF_TEXT_TYPE = "urn:nfc:wkt:T"
+MDEF_JSON_TYPE = "application/json"
 
 logger = logging.getLogger(__name__)
-
 
 # pylint: disable=R0902
 class NfcHandler:
@@ -33,6 +34,29 @@ class NfcHandler:
         self.write_event = Event()
         self.write_spool = None
         self.write_filament = None
+
+    @classmethod
+    def generate_spool_record(cls, spool, filament, version="1.0"):
+        """
+        Generate an NFC spool record in JSON format.
+
+        Args:
+            spool (str): The spool id from spoolman.
+            filament (str): The filament id from spoolman.
+            version (str, optional): The version of the protocol. Defaults to "1.0".
+
+        Returns:
+            ndef.Record: The NFC record containing the spool and filament information.
+        """
+        record = {
+            'protocol': 'nfc2klipper',
+            'version': version,
+            'spool': spool,
+            'filament': filament
+        }
+
+        return ndef.Record(MDEF_JSON_TYPE, name="nfc2klipper", data=json.dumps(record))
+
 
     def set_no_tag_present_callback(self, on_nfc_no_tag_present):
         """Sets a callback that will be called when no tag is present"""
@@ -73,7 +97,17 @@ class NfcHandler:
         filament = None
 
         for record in records:
+            # Look for the JSON record first
+            if record.type == MDEF_JSON_TYPE and record.name == "nfc2klipper":
+                logger.info("Read JSON record: %s", record)
+                data = json.loads(record.data)
+                spool = data.get("spool")
+                filament = data.get("filament")
+                break
+
+            # Look for the text record
             if record.type == NDEF_TEXT_TYPE:
+                logger.info("Read text record: %s", record)
                 for line in record.text.splitlines():
                     line = line.split(":")
                     if len(line) == 2:
@@ -81,8 +115,9 @@ class NfcHandler:
                             spool = line[1]
                         if line[0] == FILAMENT:
                             filament = line[1]
-            else:
-                logger.info("Read other record: %s", record)
+                break
+
+            logger.info("Read other record: %s", record)
 
         return spool, filament
 
@@ -130,9 +165,18 @@ class NfcHandler:
         """Write given spool/filament ids to the tag"""
         try:
             if tag.ndef and tag.ndef.is_writeable:
-                tag.ndef.records = [
-                    ndef.TextRecord(f"{SPOOL}:{spool}\n{FILAMENT}:{filament}\n")
-                ]
+                records = []
+                for record in tag.ndef.records:
+                    # Skip existing JSON record as we'll append it at the end
+                    if record.type == MDEF_JSON_TYPE and record.name == "nfc2klipper":
+                        continue
+                    # Skip the old format, as we're upgrading to the new JSON format
+                    if record.type == NDEF_TEXT_TYPE and record.text.find("SPOOL:") != -1:
+                        continue
+                    records.append(record)
+                records.append(NfcHandler.generate_spool_record(spool, filament))
+                tag.ndef.records = records
+
                 return True
             self.status = "Tag is write protected"
         except Exception as ex:  # pylint: disable=W0718
@@ -160,8 +204,21 @@ class NfcHandler:
             self.write_lock.release()
         return did_write
 
+    @classmethod
+    def _check_for_needs_update(cls, tag):
+        if tag.ndef is None or not tag.ndef.records:
+            return False
+
+        for record in tag.ndef.records:
+            if record.type == NDEF_TEXT_TYPE and record.text.find("SPOOL:") != -1:
+                return True
+
     def _read_from_tag(self, tag):
         """Read data from tag and call callback"""
         if self.on_nfc_tag_present:
             spool, filament = NfcHandler.get_data_from_ndef_records(tag.ndef.records)
+            # Check if the tag needs to be updated, if so update it while it's in range.
+            if NfcHandler._check_for_needs_update(tag):
+                logger.info("Found old tag format, updating to new format")
+                self._set_write_info(spool, filament)
             self.on_nfc_tag_present(spool, filament)
