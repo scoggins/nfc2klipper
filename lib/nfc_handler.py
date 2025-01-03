@@ -16,7 +16,7 @@ from nfc.clf import RemoteTarget
 SPOOL = "SPOOL"
 FILAMENT = "FILAMENT"
 NDEF_TEXT_TYPE = "urn:nfc:wkt:T"
-MDEF_JSON_TYPE = "application/json"
+NDEF_JSON_TYPE = "application/json"
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class NfcHandler:
             'filament': filament
         }
 
-        return ndef.Record(MDEF_JSON_TYPE, name="nfc2klipper", data=json.dumps(record))
+        return ndef.Record(NDEF_JSON_TYPE, name="nfc2klipper", data=json.dumps(record))
 
 
     def set_no_tag_present_callback(self, on_nfc_no_tag_present):
@@ -98,7 +98,7 @@ class NfcHandler:
 
         for record in records:
             # Look for the JSON record first
-            if record.type == MDEF_JSON_TYPE and record.name == "nfc2klipper":
+            if record.type == NDEF_JSON_TYPE and record.name == "nfc2klipper":
                 logger.info("Read JSON record: %s", record)
                 data = json.loads(record.data)
                 spool = data.get("spool")
@@ -168,7 +168,7 @@ class NfcHandler:
                 records = []
                 for record in tag.ndef.records:
                     # Skip existing JSON record as we'll append it at the end
-                    if record.type == MDEF_JSON_TYPE and record.name == "nfc2klipper":
+                    if record.type == NDEF_JSON_TYPE and record.name == "nfc2klipper":
                         continue
                     # Skip the old format, as we're upgrading to the new JSON format
                     if record.type == NDEF_TEXT_TYPE and record.text.find("SPOOL:") != -1:
