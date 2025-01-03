@@ -213,6 +213,8 @@ class NfcHandler:
             if record.type == NDEF_TEXT_TYPE and record.text.find("SPOOL:") != -1:
                 return True
 
+        return False
+
     def _read_from_tag(self, tag):
         """Read data from tag and call callback"""
         if self.on_nfc_tag_present:
