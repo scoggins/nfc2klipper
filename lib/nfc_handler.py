@@ -37,17 +37,7 @@ class NfcHandler:
 
     @classmethod
     def generate_spool_record(cls, spool, filament, version="1.0"):
-        """
-        Generate an NFC spool record in JSON format.
-
-        Args:
-            spool (str): The spool id from spoolman.
-            filament (str): The filament id from spoolman.
-            version (str, optional): The version of the protocol. Defaults to "1.0".
-
-        Returns:
-            ndef.Record: The NFC record containing the spool and filament information.
-        """
+        """Generate an NFC spool record in JSON format and return it."""
         record = {
             'protocol': 'nfc2klipper',
             'version': version,
@@ -206,6 +196,7 @@ class NfcHandler:
 
     @classmethod
     def _check_for_needs_update(cls, tag):
+        """Check if the tag needs to be updated"""
         if tag.ndef is None or tag.ndef.records is None:
             return False
 
