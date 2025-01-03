@@ -206,7 +206,7 @@ class NfcHandler:
 
     @classmethod
     def _check_for_needs_update(cls, tag):
-        if tag.ndef is None or not tag.ndef.records:
+        if tag.ndef is None or tag.ndef.records is None:
             return False
 
         for record in tag.ndef.records:
